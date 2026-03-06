@@ -6,6 +6,7 @@ const router = express.Router();
 /* Create Booking WITH OTP */
 router.post("/", async (req, res) => {
   try {
+    console.log("📥 Booking request received:", req.body);
     const {
       pickup,
       drop,
@@ -18,11 +19,20 @@ router.post("/", async (req, res) => {
       status
     } = req.body;
 
+    if (!userId) {
+      console.error("❌ Booking Error: No userId provided in request");
+      return res.status(400).json({ message: "userId is required for booking" });
+    }
+
     const user = await User.findById(userId);
+    if (!user) {
+      console.error("❌ Booking Error: User not found with ID:", userId);
+      return res.status(404).json({ message: "User not found" });
+    }
 
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
 
-    const booking = await Booking.create({
+    const bookingData = {
       pickup,
       drop,
       amount,
@@ -30,24 +40,36 @@ router.post("/", async (req, res) => {
       distance,
       eta,
       pricePerKm,
-      status,
+      status: status || "BOOKED",
       otp,
       userId: user._id,
       customerName: user.name,
       customerPhone: user.phone,
-      status: "BOOKED",
       expiresAt: new Date(Date.now() + 60000), // 1 minute expiry
-    });
+    };
+
+    console.log("💾 Creating booking in DB with data:", bookingData);
+    const booking = await Booking.create(bookingData);
 
     // 🔥 EMIT FULL BOOKING TO DRIVERS
     const io = req.app.get("io");
-    io.emit("new_ride_available", booking);
+    if (io) {
+      console.log("📡 Emitting new_ride_available event via Socket.io");
+      io.emit("new_ride_available", booking);
+    } else {
+      console.warn("⚠️ Socket.io instance (io) not found in app settings");
+    }
 
+    console.log("✅ Booking successful:", booking._id);
     res.status(201).json(booking);
 
   } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: "Booking failed" });
+    console.error("🔥 CRITICAL BOOKING ERROR:", err);
+    res.status(500).json({ 
+      message: "Booking failed", 
+      error: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined 
+    });
   }
 });
 router.put("/:id/complete", async (req, res) => {
