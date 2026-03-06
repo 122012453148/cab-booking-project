@@ -72,6 +72,25 @@ router.post("/", async (req, res) => {
     });
   }
 });
+router.put("/:id/start", async (req, res) => {
+  try {
+    const booking = await Booking.findByIdAndUpdate(
+      req.params.id,
+      { status: "ON_TRIP" },
+      { new: true }
+    );
+
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("rideStarted", booking._id);
+    }
+
+    res.json(booking);
+  } catch (err) {
+    res.status(500).json({ message: "Start trip failed" });
+  }
+});
+
 router.put("/:id/complete", async (req, res) => {
   try {
     const booking = await Booking.findByIdAndUpdate(
