@@ -10,11 +10,26 @@ const router = express.Router();
 /* ---------------- REGISTER ---------------- */
 router.post("/register", async (req, res) => {
   try {
+    console.log("📝 Registration attempt for:", req.body?.email);
     const { name, email, phone, password } = req.body;
 
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: "Missing required fields (name, email, or password)" });
+    }
+
+    // Check if DB is connected
+    if (mongoose.connection.readyState !== 1) {
+      console.error("❌ Database not connected. State:", mongoose.connection.readyState);
+      return res.status(500).json({ 
+        message: "Database connection is not ready", 
+        state: mongoose.connection.readyState 
+      });
+    }
+
     const existingUser = await User.findOne({ email });
-    if (existingUser)
-      return res.status(400).json({ message: "User already exists" });
+    if (existingUser) {
+      return res.status(400).json({ message: "User already exists with this email" });
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -25,9 +40,18 @@ router.post("/register", async (req, res) => {
       password: hashedPassword,
     });
 
-    res.status(201).json(user);
+    console.log("✅ User created successfully:", user.email);
+    res.status(201).json({
+      message: "User registered successfully",
+      user: { id: user._id, name: user.name, email: user.email }
+    });
   } catch (err) {
-    res.status(500).json({ message: "Registration failed" });
+    console.error("🔥 Registration Crash:", err);
+    res.status(500).json({ 
+      message: "Registration crashed on server", 
+      error: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 });
 

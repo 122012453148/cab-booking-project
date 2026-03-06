@@ -26,7 +26,7 @@ const server = http.createServer(app);
 /* ================= SOCKET SETUP ================= */
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
     methods: ["GET", "POST"],
   },
 });
@@ -103,7 +103,23 @@ socket.on("acceptRide", async ({ bookingId, driverId }) => {
 });
 
 /* ================= MIDDLEWARE ================= */
-app.use(cors());
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://weeflycab.vercel.app",
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
 app.use(express.json());
 
 /* ================= ROUTES ================= */
@@ -115,13 +131,27 @@ app.use("/api/drivers", driverRoutes);
 app.use("/api/admin", adminRoutes);
 
 /* ================= DB ================= */
-mongoose.connect("mongodb://127.0.0.1:27017/cab_booking");
+const dbURI = process.env.MONGO_URI;
+
+if (!dbURI) {
+  console.error("❌ CRITICAL ERROR: MONGO_URI is not defined in environment variables!");
+  console.error("Please add MONGO_URI to your Render Environment settings.");
+} else {
+  console.log("📡 Attempting to connect to MongoDB...");
+}
+
+mongoose.connect(dbURI || "mongodb://127.0.0.1:27017/cab_booking")
+  .then(() => console.log("✅ MongoDB connected successfully"))
+  .catch(err => {
+    console.error("❌ MongoDB connection error details:");
+    console.error(err);
+  });
 
 mongoose.connection.once("open", () => {
   console.log("✅ MongoDB connected");
 });
 
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
