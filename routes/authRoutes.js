@@ -21,9 +21,9 @@ router.post("/register", async (req, res) => {
     // Check if DB is connected
     if (mongoose.connection.readyState !== 1) {
       console.error("❌ Database not connected. State:", mongoose.connection.readyState);
-      return res.status(500).json({ 
-        message: "Database connection is not ready", 
-        state: mongoose.connection.readyState 
+      return res.status(500).json({
+        message: "Database connection is not ready",
+        state: mongoose.connection.readyState
       });
     }
 
@@ -48,8 +48,8 @@ router.post("/register", async (req, res) => {
     });
   } catch (err) {
     console.error("🔥 Registration Crash:", err);
-    res.status(500).json({ 
-      message: "Registration crashed on server", 
+    res.status(500).json({
+      message: "Registration crashed on server",
       error: err.message,
       stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
