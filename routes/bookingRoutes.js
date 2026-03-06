@@ -1,6 +1,7 @@
 import express from "express";
 import Booking from "../models/Booking.js";
 import User from "../models/User.js";
+import Driver from "../models/Driver.js"; // Added Missing Import
 const router = express.Router();
 
 /* Create Booking WITH OTP */
@@ -99,12 +100,48 @@ router.put("/:id/complete", async (req, res) => {
       { new: true }
     );
 
+    if (booking && booking.driverId) {
+      await Driver.findByIdAndUpdate(booking.driverId, {
+        $inc: { totalRides: 1, totalEarnings: booking.amount }
+      });
+    }
+
     const io = req.app.get("io");
-    io.emit("rideCompleted", booking._id);
+    if (io) {
+      io.emit("rideCompleted", booking._id);
+    }
 
     res.json(booking);
   } catch (err) {
     res.status(500).json({ message: "Complete failed" });
+  }
+});
+
+router.post("/:id/rate", async (req, res) => {
+  try {
+    const { rating } = req.body;
+    const booking = await Booking.findById(req.params.id);
+    
+    if (!booking || !booking.driverId) {
+      return res.status(404).json({ message: "Booking or Driver not found" });
+    }
+
+    const driver = await Driver.findById(booking.driverId);
+    if (driver) {
+      // Calculate new average rating
+      const currentTotalRating = (driver.rating || 0) * (driver.ratingCount || 0);
+      const newRatingCount = (driver.ratingCount || 0) + 1;
+      const newRating = (currentTotalRating + rating) / newRatingCount;
+
+      await Driver.findByIdAndUpdate(booking.driverId, {
+        rating: parseFloat(newRating.toFixed(1)),
+        ratingCount: newRatingCount
+      });
+    }
+
+    res.json({ message: "Rating submitted" });
+  } catch (err) {
+    res.status(500).json({ message: "Rating failed" });
   }
 });
 
